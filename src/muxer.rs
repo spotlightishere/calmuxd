@@ -160,7 +160,7 @@ async fn formulate_calendar(feed: FeedConfig) -> Result<String, ParserError> {
 
         let calendar_contents = client.get(fixed_url).send().await?.text().await?;
         let current_contents = scrape_contents(calendar_contents)?;
-        writeln!(combined_events, "{}", current_contents)?;
+        combined_events += &current_contents;
     }
 
     // Begin writing our response!
