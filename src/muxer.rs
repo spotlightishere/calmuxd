@@ -4,7 +4,6 @@
 use std::{
     error::Error,
     fmt::{self, Write},
-    fs,
 };
 
 use crate::FeedConfig;
@@ -18,6 +17,7 @@ use axum::{
 enum ParserError {
     InvalidCalendar,
     MalformedCalendar,
+    FetchError(reqwest::Error),
     FmtError(fmt::Error),
 }
 
@@ -28,6 +28,7 @@ impl fmt::Display for ParserError {
         match self {
             ParserError::InvalidCalendar => write!(f, "no valid calendar object was present"),
             ParserError::MalformedCalendar => write!(f, "a calendar component is malformed"),
+            ParserError::FetchError(e) => write!(f, "calendar fetch error: {}", e),
             ParserError::FmtError(e) => write!(f, "underlying formatting error: {}", e),
         }
     }
@@ -38,6 +39,19 @@ impl From<fmt::Error> for ParserError {
         ParserError::FmtError(value)
     }
 }
+
+impl From<reqwest::Error> for ParserError {
+    fn from(value: reqwest::Error) -> Self {
+        ParserError::FetchError(value)
+    }
+}
+
+/// PRODID in the format as defiend within RFC 5545, Section 3.7.3 ("Product identifier").
+/// Example: `-//calmud//CALMUXD 0.1.0//EN`
+const PRODID_FORMAT: &str = concat!("-//calmuxd//CALMUXD ", env!("CARGO_PKG_VERSION"), "//EN");
+
+/// The User-Agent used when fetching feed contents.
+const CALMUXD_USER_AGENT: &str = concat!("calmuxd/", env!("CARGO_PKG_VERSION"));
 
 /// Obtains a calendar property's value.
 /// It's expected that input is in the format of "PROPERTY:VALUE".
@@ -130,11 +144,24 @@ fn scrape_contents(calendar: String) -> Result<String, ParserError> {
     Ok(captured_lines)
 }
 
-fn formulate_calendar(feed: FeedConfig) -> Result<String, ParserError> {
-    let calendar_contents =
-        fs::read_to_string("./temporary.ics").expect("failed to read dummy data");
-    // TODO(spotlightishere): Handle error correctly
-    let event_contents = scrape_contents(calendar_contents)?;
+/// Fetches configured calendar URLs and combines their contents.
+async fn formulate_calendar(feed: FeedConfig) -> Result<String, ParserError> {
+    // Ensure we properly identify ourselves when making requests.
+    let client = reqwest::Client::builder()
+        .user_agent(CALMUXD_USER_AGENT)
+        .build()?;
+
+    // Fetch all of our calendar feeds, and scrape their contents.
+    let mut combined_events = String::new();
+    for feed_url in feed.urls {
+        // If we encounter `webcal`, assume `https`.
+        // (This should probably technically be `http`, but this works for our purposes...)
+        let fixed_url = feed_url.replace("webcal", "https");
+
+        let calendar_contents = client.get(fixed_url).send().await?.text().await?;
+        let current_contents = scrape_contents(calendar_contents)?;
+        writeln!(combined_events, "{}", current_contents)?;
+    }
 
     // Begin writing our response!
     let mut response = String::new();
@@ -146,8 +173,7 @@ fn formulate_calendar(feed: FeedConfig) -> Result<String, ParserError> {
     writeln!(response, "VERSION:2.0")?;
     // Section 3.7.3 ("Product identifier") defines the format used below.
     // Example: `-//calmud//CALMUXD 0.1.0//EN`
-    let prodid = concat!("-//calmuxd//CALMUXD ", env!("CARGO_PKG_VERSION"), "//EN");
-    writeln!(response, "PRODID:{}", prodid)?;
+    writeln!(response, "PRODID:{}", PRODID_FORMAT)?;
 
     // Next, if present, provide a calendar name.
     // (This header is primarily used by Microsoft Outlook.)
@@ -160,7 +186,7 @@ fn formulate_calendar(feed: FeedConfig) -> Result<String, ParserError> {
     }
 
     // Lastly, we can write all of our event contents.
-    write!(response, "{}", event_contents)?;
+    write!(response, "{}", combined_events)?;
 
     // We're done!
     writeln!(response, "END:VCALENDAR")?;
@@ -170,7 +196,7 @@ fn formulate_calendar(feed: FeedConfig) -> Result<String, ParserError> {
 pub async fn handle_feed(feed: FeedConfig) -> impl IntoResponse {
     // TODO(spotlightishere): Fetch configured feeds
     // TODO(spotlightishere): We should handle errors with a little bit more grace.
-    match formulate_calendar(feed) {
+    match formulate_calendar(feed).await {
         Ok(response) => (
             StatusCode::OK,
             [(header::CONTENT_TYPE, "text/calendar")],

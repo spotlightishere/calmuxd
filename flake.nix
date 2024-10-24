@@ -11,29 +11,43 @@
     (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        # We need to link against a few additional packages.
+        darwinPkgs = with pkgs; (lib.optional stdenv.hostPlatform.isDarwin (with darwin.apple_sdk.frameworks; [
+          libiconv
+          CoreFoundation
+          Security
+          SystemConfiguration
+        ]));
       in
       rec {
         # First, a simple shell to permit Rust development.
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
+        devShells.default = with pkgs; mkShell {
+          nativeBuildInputs = [ pkg-config ];
+
+          buildInputs = [
             cargo
             clippy
             rustc
-          ] ++ lib.optional stdenv.hostPlatform.isDarwin libiconv;
+
+            openssl
+          ] ++ darwinPkgs;
 
           RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
         };
 
         # Next, the raw `calmuxd` package itself.
         packages = {
-          calmuxd = pkgs.rustPlatform.buildRustPackage {
+          calmuxd = with pkgs; rustPlatform.buildRustPackage {
             pname = "calmuxd";
             version = "0.1.0";
+
+            nativeBuildInputs = [ pkg-config ];
+            buildInputs = [ openssl ] ++ darwinPkgs;
 
             src = ./.;
             cargoLock.lockFile = ./Cargo.lock;
 
-            meta = with pkgs.lib; {
+            meta = with lib; {
               description = "Simple calendar feed muxing agent";
               homepage = "https://github.com/spotlightishere/calmuxd";
               license = licenses.mit;
