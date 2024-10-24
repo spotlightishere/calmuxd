@@ -10,8 +10,19 @@ mod muxer;
 async fn main() {
     // TODO(spotlightishere): Implement argument parsing
     // We should have our config location set to a defined path.
+    let arguments: Vec<String> = std::env::args().collect();
+    let config_path: String;
+    if arguments.len() > 2 {
+        panic!("Too many arguments specified! Please specify a path to your configuration, or none at all.")
+    } else if arguments.len() == 2 {
+        config_path = arguments[1].clone();
+    } else {
+        // Default to config.json if otherwise not specified.
+        config_path = "./config.json".to_string();
+    }
+
     let config_contents =
-        fs::read_to_string("./config.json").expect("should be able to open configuration");
+        fs::read_to_string(config_path).expect("should be able to open configuration");
     let config: Config =
         serde_json::from_str(&config_contents).expect("should be able to parse configuration");
 

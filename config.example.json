@@ -1,0 +1,13 @@
+{
+  "listen_address": "127.0.0.1:8080",
+  "feeds": [
+    {
+      "endpoint": "/personal-feed",
+      "visual_name": "Personal",
+      "color": "#ff69bd",
+      "urls": [
+        "https://calendars.icloud.com/holidays/us_en-us.ics/"
+      ]
+    }
+  ]
+}
