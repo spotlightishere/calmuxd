@@ -59,5 +59,10 @@
 
         # Our preferred Nix formatter.
         formatter = pkgs.nixpkgs-fmt;
-      }));
+      }))
+    //
+    {
+      # Provide a NixOS module defining our service and config.
+      nixosModules.default = import ./module.nix { inherit self; };
+    };
 }
