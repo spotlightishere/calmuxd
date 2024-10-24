@@ -14,5 +14,5 @@ A development workflow might be similar to following:
 
 1. Check out this repository
 2. If you have not already, `direnv allow` to enter the Nix-provided development environment. (Alternatively, run `nix shell` directly.)
-3. Make tweaks as necessary.
+3. Make tweaks as necessary, running `cargo clippy` throughout to assist with style.
 4. Ensure you have run `cargo fmt` for Rust changes. If Nix-related files have been modified, similarly perform `nix fmt`.

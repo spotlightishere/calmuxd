@@ -17,6 +17,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             cargo
+            clippy
             rustc
           ] ++ lib.optional stdenv.hostPlatform.isDarwin libiconv;
 
