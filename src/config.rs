@@ -23,7 +23,7 @@ pub struct FeedConfig {
 
     /// The color that Apple devies will use for this feed.
     /// Expected form is hexadecimal: `#ff69bd`.
-    pub color: String,
+    pub color: Option<String>,
 
     /// The URLs to fetch and mux upon feed request.
     pub urls: Vec<String>,
