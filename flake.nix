@@ -11,13 +11,6 @@
     (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        # We need to link against a few additional packages.
-        darwinPkgs = with pkgs; (lib.optional stdenv.hostPlatform.isDarwin (with darwin.apple_sdk.frameworks; [
-          libiconv
-          CoreFoundation
-          Security
-          SystemConfiguration
-        ]));
       in
       rec {
         # First, a simple shell to permit Rust development.
@@ -30,7 +23,7 @@
             rustc
 
             openssl
-          ] ++ darwinPkgs;
+          ];
 
           RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
         };
@@ -42,7 +35,7 @@
             version = "0.1.0";
 
             nativeBuildInputs = [ pkg-config ];
-            buildInputs = [ openssl ] ++ darwinPkgs;
+            buildInputs = [ openssl ];
 
             src = ./.;
             cargoLock.lockFile = ./Cargo.lock;
